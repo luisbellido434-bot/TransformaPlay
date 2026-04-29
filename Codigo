@@ -1,0 +1,346 @@
+import tkinter as tk
+from tkinter import messagebox
+
+import matplotlib.animation as animation
+import matplotlib.pyplot as plt
+import numpy as np
+
+
+PLOT_LIMIT = 20
+ANIMATION_FRAMES = 50
+ANIMATION_INTERVAL = 50
+
+
+puntos = []
+
+
+def rotacion(puntos_figura, angulo):
+    rad = np.radians(angulo)
+    matriz = np.array(
+        [
+            [np.cos(rad), -np.sin(rad)],
+            [np.sin(rad), np.cos(rad)],
+        ]
+    )
+    return puntos_figura @ matriz.T
+
+
+def escalamiento(puntos_figura, factor):
+    matriz = np.array([[factor, 0], [0, factor]])
+    return puntos_figura @ matriz.T
+
+
+def reflexion_recta_y_mx(puntos_figura, pendiente):
+    theta = np.arctan(pendiente)
+    matriz = np.array(
+        [
+            [np.cos(2 * theta), np.sin(2 * theta)],
+            [np.sin(2 * theta), -np.cos(2 * theta)],
+        ]
+    )
+    return puntos_figura @ matriz.T
+
+
+def cerrar_figura(puntos_figura):
+    if len(puntos_figura) == 0:
+        return puntos_figura
+    return np.vstack([puntos_figura, puntos_figura[0]])
+
+
+def obtener_puntos():
+    if len(puntos) < 3:
+        messagebox.showerror("Error", "Debes ingresar al menos 3 puntos para formar una figura.")
+        return None
+    return np.array(puntos, dtype=float)
+
+
+def configurar_ejes(ax, titulo):
+    ax.set_title(titulo)
+    ax.set_xlabel("Eje X")
+    ax.set_ylabel("Eje Y")
+    ax.axhline(0, color="gray", linewidth=0.8)
+    ax.axvline(0, color="gray", linewidth=0.8)
+    ax.grid(True, linestyle="--", alpha=0.5)
+    ax.set_aspect("equal", adjustable="box")
+    ax.set_xlim(-PLOT_LIMIT, PLOT_LIMIT)
+    ax.set_ylim(-PLOT_LIMIT, PLOT_LIMIT)
+
+
+def mostrar_original():
+    figura = obtener_puntos()
+    if figura is None:
+        return
+
+    figura_cerrada = cerrar_figura(figura)
+    fig, ax = plt.subplots()
+    ax.plot(figura_cerrada[:, 0], figura_cerrada[:, 1], "o--", label="Figura original")
+    configurar_ejes(ax, "Figura Original")
+    ax.legend()
+    plt.show()
+
+
+def animar_transformacion(original, transformado, titulo):
+    fig, ax = plt.subplots()
+    original_cerrada = cerrar_figura(original)
+    animacion_ref = None
+
+    def update(frame):
+        ax.clear()
+        progreso = frame / (ANIMATION_FRAMES - 1)
+        intermedia = original + progreso * (transformado - original)
+        intermedia_cerrada = cerrar_figura(intermedia)
+
+        ax.plot(
+            original_cerrada[:, 0],
+            original_cerrada[:, 1],
+            "o--",
+            color="gray",
+            label="Original",
+        )
+        ax.plot(
+            intermedia_cerrada[:, 0],
+            intermedia_cerrada[:, 1],
+            "o-",
+            color="tab:blue",
+            label=titulo,
+        )
+        configurar_ejes(ax, f"{titulo} progresiva")
+        ax.legend()
+
+    animacion_ref = animation.FuncAnimation(
+        fig,
+        update,
+        frames=ANIMATION_FRAMES,
+        interval=ANIMATION_INTERVAL,
+        repeat=False,
+    )
+    fig._animacion_ref = animacion_ref
+    plt.show()
+
+
+def obtener_transformaciones(figura):
+    angulo = float(e_ang.get())
+    factor = float(e_esc.get())
+    pendiente = float(e_ref.get())
+    return {
+        "Rotacion": rotacion(figura, angulo),
+        "Escalamiento": escalamiento(figura, factor),
+        "Reflexion": reflexion_recta_y_mx(figura, pendiente),
+    }
+
+
+def comparar_todas():
+    figura = obtener_puntos()
+    if figura is None:
+        return
+
+    try:
+        transformaciones = obtener_transformaciones(figura)
+    except ValueError:
+        messagebox.showerror("Error", "Ingresa valores numericos validos para angulo, escala y pendiente.")
+        return
+
+    fig, ax = plt.subplots()
+    original_cerrada = cerrar_figura(figura)
+    animacion_ref = None
+    colores = {
+        "Rotacion": "tab:blue",
+        "Escalamiento": "tab:orange",
+        "Reflexion": "tab:green",
+    }
+
+    def update(frame):
+        ax.clear()
+        progreso = frame / (ANIMATION_FRAMES - 1)
+        ax.plot(
+            original_cerrada[:, 0],
+            original_cerrada[:, 1],
+            "o--",
+            color="black",
+            linewidth=2,
+            label="Original",
+        )
+
+        for nombre, transformada in transformaciones.items():
+            intermedia = figura + progreso * (transformada - figura)
+            intermedia_cerrada = cerrar_figura(intermedia)
+            ax.plot(
+                intermedia_cerrada[:, 0],
+                intermedia_cerrada[:, 1],
+                "o-",
+                color=colores[nombre],
+                label=nombre,
+            )
+
+        configurar_ejes(ax, "Animacion Comparativa")
+        ax.legend()
+
+    animacion_ref = animation.FuncAnimation(
+        fig,
+        update,
+        frames=ANIMATION_FRAMES,
+        interval=ANIMATION_INTERVAL,
+        repeat=False,
+    )
+    fig._animacion_ref = animacion_ref
+    plt.show()
+
+
+def mostrar_comparacion_final():
+    figura = obtener_puntos()
+    if figura is None:
+        return
+
+    try:
+        transformaciones = obtener_transformaciones(figura)
+    except ValueError:
+        messagebox.showerror("Error", "Ingresa valores numericos validos para angulo, escala y pendiente.")
+        return
+
+    fig, ax = plt.subplots()
+    original_cerrada = cerrar_figura(figura)
+    ax.plot(
+        original_cerrada[:, 0],
+        original_cerrada[:, 1],
+        "o--",
+        color="black",
+        linewidth=2,
+        label="Original",
+    )
+
+    colores = {
+        "Rotacion": "tab:blue",
+        "Escalamiento": "tab:orange",
+        "Reflexion": "tab:green",
+    }
+    for nombre, transformada in transformaciones.items():
+        figura_cerrada = cerrar_figura(transformada)
+        ax.plot(
+            figura_cerrada[:, 0],
+            figura_cerrada[:, 1],
+            "o-",
+            color=colores[nombre],
+            label=nombre,
+        )
+
+    configurar_ejes(ax, "Comparativa Final de Transformaciones")
+    ax.legend()
+    plt.show()
+
+
+def agregar_punto():
+    try:
+        x = float(e_x.get())
+        y = float(e_y.get())
+    except ValueError:
+        messagebox.showerror("Error", "Ingresa valores numericos validos para X e Y.")
+        return
+
+    puntos.append([x, y])
+    lista.insert(tk.END, f"({x:.2f}, {y:.2f})")
+    e_x.delete(0, tk.END)
+    e_y.delete(0, tk.END)
+    e_x.focus_set()
+
+
+def limpiar_puntos():
+    puntos.clear()
+    lista.delete(0, tk.END)
+
+
+def ejecutar_rotacion():
+    figura = obtener_puntos()
+    if figura is None:
+        return
+
+    try:
+        angulo = float(e_ang.get())
+    except ValueError:
+        messagebox.showerror("Error", "Ingresa un angulo valido.")
+        return
+
+    animar_transformacion(figura, rotacion(figura, angulo), "Rotacion")
+
+
+def ejecutar_escalamiento():
+    figura = obtener_puntos()
+    if figura is None:
+        return
+
+    try:
+        factor = float(e_esc.get())
+    except ValueError:
+        messagebox.showerror("Error", "Ingresa un factor de escala valido.")
+        return
+
+    animar_transformacion(figura, escalamiento(figura, factor), "Escalamiento")
+
+
+def ejecutar_reflexion():
+    figura = obtener_puntos()
+    if figura is None:
+        return
+
+    try:
+        pendiente = float(e_ref.get())
+    except ValueError:
+        messagebox.showerror("Error", "Ingresa una pendiente valida para la recta y = mx.")
+        return
+
+    animar_transformacion(figura, reflexion_recta_y_mx(figura, pendiente), "Reflexion")
+
+
+def mostrar_contexto():
+    messagebox.showinfo(
+        "Contexto real",
+        "Videojuegos: la rotacion cambia la orientacion de personajes y objetos.\n\n"
+        "Interfaces graficas: el escalamiento ajusta el tamano de iconos, botones y ventanas.\n\n"
+        "Simulaciones: las transformaciones permiten estudiar movimiento, deformacion y cambios geometricos.",
+    )
+
+
+root = tk.Tk()
+root.title("TransformaPlay")
+root.geometry("360x560")
+
+tk.Label(root, text="Crear figura en R^2", font=("Arial", 14, "bold")).pack(pady=10)
+tk.Label(root, text="Ingresa puntos (x, y)").pack()
+
+frame_puntos = tk.Frame(root)
+frame_puntos.pack(pady=5)
+
+e_x = tk.Entry(frame_puntos, width=8)
+e_x.pack(side=tk.LEFT, padx=3)
+e_y = tk.Entry(frame_puntos, width=8)
+e_y.pack(side=tk.LEFT, padx=3)
+
+tk.Button(frame_puntos, text="Agregar", command=agregar_punto).pack(side=tk.LEFT, padx=3)
+tk.Button(frame_puntos, text="Limpiar", command=limpiar_puntos).pack(side=tk.LEFT, padx=3)
+
+lista = tk.Listbox(root, width=28, height=8)
+lista.pack(pady=8)
+
+tk.Button(root, text="Mostrar figura original", command=mostrar_original).pack(pady=4)
+
+tk.Label(root, text="Angulo de rotacion (grados)").pack()
+e_ang = tk.Entry(root)
+e_ang.pack()
+tk.Button(root, text="Aplicar rotacion", command=ejecutar_rotacion).pack(pady=4)
+
+tk.Label(root, text="Factor de escala").pack()
+e_esc = tk.Entry(root)
+e_esc.pack()
+tk.Button(root, text="Aplicar escalamiento", command=ejecutar_escalamiento).pack(pady=4)
+
+tk.Label(root, text="Pendiente de la recta y = mx").pack()
+e_ref = tk.Entry(root)
+e_ref.pack()
+tk.Button(root, text="Aplicar reflexion", command=ejecutar_reflexion).pack(pady=4)
+
+tk.Button(root, text="Animar comparacion", bg="green", fg="white", command=comparar_todas).pack(pady=10)
+tk.Button(root, text="Mostrar comparativa final", command=mostrar_comparacion_final).pack(pady=4)
+
+tk.Button(root, text="Contexto real", command=mostrar_contexto).pack(pady=6)
+
+e_x.focus_set()
+root.mainloop()
